@@ -42,6 +42,9 @@ Shortcuts:
 '''
     )
     parser.add_argument(
+        '-cf', '--conflictFile', metavar='conflictFile', nargs='?',
+        dest='conflictFile', help='HTML file containing conflicts')
+    parser.add_argument(
         'inputfile', metavar='file', nargs='?',
         help='input file to be viewed')
     parser.add_argument(
@@ -75,7 +78,11 @@ Shortcuts:
             win.set_dotcode(sys.stdin.buffer.read())
         else:
             win.open_file(inputfile)
-
+            
+            # also open the conflict file, if provided
+            if options.conflictFile and len(options.conflictFile) > 1 and options.conflictFile != '-':
+                win.load_conflict_file(options.conflictFile)
+    
     if sys.platform != 'win32':
         # Reset KeyboardInterrupt SIGINT handler, so that glib loop can be stopped by it
         import signal

@@ -43,6 +43,8 @@ from . import animation
 from . import actions
 from .elements import Graph
 
+from ..conflicts import mapper 
+
 
 class DotWidget(Gtk.DrawingArea):
     """GTK widget that draws dot graphs."""
@@ -56,12 +58,18 @@ class DotWidget(Gtk.DrawingArea):
 
     filter = 'dot'
 
+    def set_conflict_graph(self, conflictGraph):
+        self.conflictNodes = conflictGraph
+        self.graph.conflictingNodes = self.conflictNodes
+
+
+    
     def __init__(self):
         Gtk.DrawingArea.__init__(self)
 
         self.graph = Graph()
         self.openfilename = None
-
+        self.conflictNodes = None
         self.set_can_focus(True)
 
         self.connect("draw", self.on_draw)
@@ -152,7 +160,7 @@ class DotWidget(Gtk.DrawingArea):
     def set_xdotcode(self, xdotcode, center=True):
         assert isinstance(xdotcode, bytes)
         parser = XDotParser(xdotcode)
-        self.graph = parser.parse()
+        self.graph = parser.parse()        
         self.zoom_image(self.zoom_ratio, center=center)
 
     def reload(self):
@@ -523,6 +531,7 @@ class DotWindow(Gtk.Window):
             <toolitem action="ZoomOut"/>
             <toolitem action="ZoomFit"/>
             <toolitem action="Zoom100"/>
+            <toolitem action="AddConflictFile" />
             <separator/>
             <toolitem name="Find" action="Find"/>
         </toolbar>
@@ -534,7 +543,6 @@ class DotWindow(Gtk.Window):
     def __init__(self, widget=None, width=512, height=512):
         Gtk.Window.__init__(self)
 
-        self.graph = Graph()
 
         window = self
 
@@ -568,6 +576,8 @@ class DotWindow(Gtk.Window):
             ('ZoomOut', Gtk.STOCK_ZOOM_OUT, None, None, None, self.dotwidget.on_zoom_out),
             ('ZoomFit', Gtk.STOCK_ZOOM_FIT, None, None, None, self.dotwidget.on_zoom_fit),
             ('Zoom100', Gtk.STOCK_ZOOM_100, None, None, None, self.dotwidget.on_zoom_100),
+            ('AddConflictFile', Gtk.STOCK_OPEN, None, None, 
+             "Adds a conflict file", self.on_open_conflict_file)
         ))
 
         self.back_action = Gtk.Action('Back', None, None, Gtk.STOCK_GO_BACK)
@@ -669,6 +679,37 @@ class DotWindow(Gtk.Window):
             fp.close()
         except IOError as ex:
             self.error_dialog(str(ex))
+
+    def on_open_conflict_file(self, action):
+        chooser = Gtk.FileChooserDialog(parent=self,
+                                        title="Open html conflict File",
+                                        action=Gtk.FileChooserAction.OPEN,
+                                        buttons=(Gtk.STOCK_CANCEL,
+                                                 Gtk.ResponseType.CANCEL,
+                                                 Gtk.STOCK_OPEN,
+                                                 Gtk.ResponseType.OK))
+        chooser.set_default_response(Gtk.ResponseType.OK)
+        chooser.set_current_folder(self.last_open_dir)
+        filter = Gtk.FileFilter()
+        filter.set_name("Html conflict files")
+        filter.add_pattern("*.html")
+        chooser.add_filter(filter)
+        filter = Gtk.FileFilter()
+        filter.set_name("All files")
+        filter.add_pattern("*")
+        chooser.add_filter(filter)
+        if chooser.run() == Gtk.ResponseType.OK:
+            filename = chooser.get_filename()
+            self.last_open_dir = chooser.get_current_folder()
+            chooser.destroy()
+            self.load_conflict_file(filename)
+        else:
+            chooser.destroy()
+    
+    def load_conflict_file(self, fileName: str):
+        conflictGraph = mapper.generateMap(fileName)
+        self.dotwidget.set_conflict_graph(conflictGraph)
+        print("loaded file")
 
     def on_open(self, action):
         chooser = Gtk.FileChooserDialog(parent=self,

@@ -16,11 +16,13 @@
 import colorsys
 import sys
 
-from .lexer import ParseError, DotLexer
+from xdot.dot.lexer import ParseError, DotLexer
 
-from ..ui.colors import lookup_color
-from ..ui.pen import Pen
-from ..ui import elements
+from xdot.ui.colors import lookup_color
+from xdot.ui.pen import Pen
+from xdot.ui import elements
+
+from xdot.dot.lexer import Lexer
 
 
 EOF = -1
@@ -51,7 +53,7 @@ SUBGRAPH = 18
 
 class Parser:
 
-    def __init__(self, lexer):
+    def __init__(self, lexer: Lexer):
         self.lexer = lexer
         self.lookahead = next(self.lexer)
 

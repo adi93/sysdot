@@ -15,9 +15,10 @@
 #
 import math
 import operator
-
+import copy
 import gi
 gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
 gi.require_version('PangoCairo', '1.0')
 
 from gi.repository import GObject
@@ -26,6 +27,11 @@ from gi.repository import GdkPixbuf
 from gi.repository import Pango
 from gi.repository import PangoCairo
 import cairo
+
+from xdot.ui.pen import Pen
+
+from typing import Tuple
+from typing import List
 
 _inf = float('inf')
 _get_bounding = operator.attrgetter('bounding')
@@ -36,23 +42,24 @@ class Shape:
     bounding = (-_inf, -_inf, _inf, _inf)
 
     def __init__(self):
+        self.pen = None
         pass
 
-    def _intersects(self, bounding):
+    def _intersects(self, bounding:Tuple[int, int, int, int]):
         x0, y0, x1, y1 = bounding
         x2, y2, x3, y3 = self.bounding
         return x2 <= x1 and x0 <= x3 and y2 <= y1 and y0 <= y3
 
-    def _fully_in(self, bounding):
+    def _fully_in(self, bounding:Tuple[int, int, int, int]):
         x0, y0, x1, y1 = bounding
         x2, y2, x3, y3 = self.bounding
         return x0 <= x2 and x3 <= x1 and y0 <= y2 and y3 <= y1
 
-    def _draw(self, cr, highlight, bounding):
+    def _draw(self, cr, highlight, bounding:Tuple[int, int, int, int]):
         """Actual draw implementation"""
         raise NotImplementedError
 
-    def draw(self, cr, highlight=False, bounding=None):
+    def draw(self, cr, highlight:bool = False, bounding:Tuple[int, int, int, int] =None):
         """Draw this shape with the given cairo context"""
         if bounding is None or self._intersects(bounding):
             self._draw(cr, highlight, bounding)
@@ -65,11 +72,18 @@ class Shape:
         else:
             return self.pen
 
-    def search_text(self, regexp):
+    def search_text(self, regexp) -> bool:
+        """
+        Returns whether this shape contains this text or not
+        """
         return False
 
     @staticmethod
-    def _bounds_from_points(points):
+    def _bounds_from_points(points: List[Tuple[int,int]]) -> Tuple[int, int, int, int]:
+        """
+        Creates a bounding rectangle from a set of points.
+        The rectangle returned encompasses all the points in 2D space.
+        """
         x0, y0 = points[0]
         x1, y1 = x0, y0
         for i in range(1, len(points)):
@@ -79,7 +93,11 @@ class Shape:
         return x0, y0, x1, y1
 
     @staticmethod
-    def _envelope_bounds(*args):
+    def _envelope_bounds(*args) -> Tuple[int, int, int, int]:
+        """
+        Creates a super bound from the list of given bounds.
+        Essentially, a rectangle enclosing all the gicen rectangles.
+        """
         xa = ya = _inf
         xb = yb = -_inf
         for bounds in args:
@@ -90,17 +108,15 @@ class Shape:
 
 
 class TextShape(Shape):
-
     LEFT, CENTER, RIGHT = -1, 0, 1
-
-    def __init__(self, pen, x, y, j, w, t):
+    def __init__(self, pen: Pen, x, y, j, w, text: str):
         Shape.__init__(self)
         self.pen = pen.copy()
         self.x = x
         self.y = y
         self.j = j  # Centering
         self.w = w  # width
-        self.t = t  # text
+        self.text = text  # text
 
     def _draw(self, cr, highlight, bounding):
 
@@ -132,7 +148,7 @@ class TextShape(Shape):
             font = Pango.FontDescription()
 
             # https://developer.gnome.org/pango/stable/PangoMarkupFormat.html
-            markup = GObject.markup_escape_text(self.t)
+            markup = GObject.markup_escape_text(self.text)
             if self.pen.bold:
                 markup = '<b>' + markup + '</b>'
             if self.pen.italic:
@@ -146,7 +162,7 @@ class TextShape(Shape):
             if self.pen.subscript:
                 markup = '<sub><small>' + markup + '</small></sub>'
 
-            success, attrs, text, accel_char = Pango.parse_markup(markup, -1, '\x00')
+            success, attrs, text, _ = Pango.parse_markup(markup, -1, '\x00')
             assert success
             layout.set_attributes(attrs)
 
@@ -199,8 +215,8 @@ class TextShape(Shape):
             cr.line_to(x+self.w, self.y)
             cr.stroke()
 
-    def search_text(self, regexp):
-        return regexp.search(self.t) is not None
+    def search_text(self, regexp) -> bool:
+        return regexp.search(self.text) is not None
 
     @property
     def bounding(self):
@@ -482,7 +498,8 @@ class Node(Element):
         self.y2 = y + 0.5*h
 
         self.url = url
-
+        self.statements = []
+        
     def is_inside(self, x, y):
         return self.x1 <= x and x <= self.x2 and self.y1 <= y and y <= self.y2
 
@@ -553,11 +570,14 @@ class Graph(Shape):
         self.nodes = nodes
         self.edges = edges
         self.outputorder = outputorder
-
+        self.conflictingNodes = {}
         self.bounding = Shape._envelope_bounds(
             map(_get_bounding, self.shapes),
             map(_get_bounding, self.nodes),
             map(_get_bounding, self.edges))
+
+    def set_conflicting_nodes(self, nodes):
+        self.conflictingNodes = nodes
 
     def get_size(self):
         return self.width, self.height
@@ -568,9 +588,25 @@ class Graph(Shape):
                 shape._draw(cr, highlight=False, bounding=bounding)
 
     def _draw_nodes(self, cr, bounding, highlight_items):
+        conflictNode = None
         for node in self.nodes:
             if bounding is None or node._intersects(bounding):
-                node._draw(cr, highlight=(node in highlight_items), bounding=bounding)
+                highlightOn = node in highlight_items
+                if highlightOn:
+                    conflictNode = node
+                else:
+                    node._draw(cr, highlight=False, bounding=bounding)
+        if conflictNode is not None:
+            self._drawConflictNodes(cr, conflictNode, bounding=bounding)
+
+    def _drawConflictNodes(self, cr, node, bounding):
+        nodesToHighlightIds =[x for x in self.conflictingNodes[int(node.id.decode("utf-8"))]]
+        print("Highlighting these nodes as well: ", nodesToHighlightIds)
+        nodesToHighlightIds.append(int(node.id.decode("utf-8")))
+        for n in self.nodes:
+            if int(n.id.decode("utf-8")) in nodesToHighlightIds:
+                n._draw(cr, highlight=True, bounding=bounding)
+        
 
     def _draw_edges(self, cr, bounding, highlight_items):
         for edge in self.edges:

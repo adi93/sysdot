@@ -50,7 +50,9 @@ class ParseError(Exception):
 
 
 class Lexer:
-
+    """
+    Gives tokens to parsers one by one
+    """
     # should be overriden by derived classes
     scanner = None
     tabsize = 8
@@ -89,7 +91,10 @@ class Lexer:
         self.col = 1
         self.filename = filename
 
-    def __next__(self):
+    def __next__(self) -> Token:
+        """
+        Returns the next token
+        """
         while True:
             # save state
             pos = self.pos
