@@ -199,16 +199,6 @@ class XDotAttrParser:
             elif op == "t":
                 f = s.read_int()
                 self.handle_font_characteristics(f)
-            elif op == "E":
-                x0, y0 = s.read_point()
-                w = s.read_float()
-                h = s.read_float()
-                self.handle_ellipse(x0, y0, w, h, filled=True)
-            elif op == "e":
-                x0, y0 = s.read_point()
-                w = s.read_float()
-                h = s.read_float()
-                self.handle_ellipse(x0, y0, w, h, filled=False)
             elif op == "L":
                 points = self.read_polygon()
                 self.handle_line(points)
@@ -224,12 +214,6 @@ class XDotAttrParser:
             elif op == "p":
                 points = self.read_polygon()
                 self.handle_polygon(points, filled=False)
-            elif op == "I":
-                x0, y0 = s.read_point()
-                w = s.read_float()
-                h = s.read_float()
-                path = s.read_text()
-                self.handle_image(x0, y0, w, h, path)
             else:
                 sys.stderr.write("error: unknown xdot opcode '%s'\n" % op)
                 sys.exit(1)
@@ -493,7 +477,7 @@ class XDotParser(DotParser):
             # create a Node object nevertheless, so that any edges to/from it
             # don't get lost.
             # TODO: Extract the position from subgraph > graph > bb attribute.
-            node = elements.Node(id, 0.0, 0.0, 0.0, 0.0, [], None)
+            node = elements.Node(id, 0.0, 0.0, 0.0, 0.0, [])
             self.node_by_name[id] = node
             return
 
@@ -505,13 +489,8 @@ class XDotParser(DotParser):
             if attr in attrs:
                 parser = XDotAttrParser(self, attrs[attr])
                 shapes.extend(parser.parse())
-        try:
-            url = attrs['URL']
-        except KeyError:
-            url = None
-        else:
-            url = url.decode('utf-8')
-        node = elements.Node(id, x, y, w, h, shapes, url)
+
+        node = elements.Node(id, x, y, w, h, shapes)
         self.node_by_name[id] = node
         if shapes:
             self.nodes.append(node)

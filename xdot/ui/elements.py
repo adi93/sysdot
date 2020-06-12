@@ -108,8 +108,25 @@ class Shape:
 
 
 class TextShape(Shape):
+
     LEFT, CENTER, RIGHT = -1, 0, 1
     def __init__(self, pen: Pen, x, y, j, w, text: str):
+        """
+        Text drawn using the baseline point (x,y). 
+        
+        The value w gives the width of the text as computed by the library.
+
+        :param x: Start x coordinate.
+        
+        :param y: Start y coordinate.
+        
+        :param j: justification. The text should be left-aligned (centered, right-aligned)
+            on the point if j is -1 (0, 1), respectively.
+        
+        :param w: width of the text
+
+        :param text: actual text 
+        """
         Shape.__init__(self)
         self.pen = pen.copy()
         self.x = x
@@ -117,6 +134,13 @@ class TextShape(Shape):
         self.j = j  # Centering
         self.w = w  # width
         self.text = text  # text
+        self.statement_id = self._createUniqueId()
+
+    def _createUniqueId(self) -> int:
+        """
+        Creates a unique statement id, within a node
+        """
+        return hash(str(self.x) + str(self.y) + self.text)
 
     def _draw(self, cr, highlight, bounding):
 
@@ -207,7 +231,7 @@ class TextShape(Shape):
             PangoCairo.show_layout(cr, layout)
             cr.restore()
 
-        if 0:  # DEBUG
+        if 1:  # DEBUG
             # show where dot thinks the text should appear
             cr.set_source_rgba(1, 0, 0, .9)
             x = self.x - 0.5 * (1 + self.j) * width
@@ -222,71 +246,6 @@ class TextShape(Shape):
     def bounding(self):
         x, w, j = self.x, self.w, self.j
         return x - 0.5 * (1 + j) * w, -_inf, x + 0.5 * (1 - j) * w, _inf
-
-
-class ImageShape(Shape):
-
-    def __init__(self, pen, x0, y0, w, h, path):
-        Shape.__init__(self)
-        self.pen = pen.copy()
-        self.x0 = x0
-        self.y0 = y0
-        self.w = w
-        self.h = h
-        self.path = path
-
-    def _draw(self, cr, highlight, bounding):
-        pixbuf = GdkPixbuf.Pixbuf.new_from_file(self.path)
-        sx = float(self.w)/float(pixbuf.get_width())
-        sy = float(self.h)/float(pixbuf.get_height())
-        cr.save()
-        cr.translate(self.x0, self.y0 - self.h)
-        cr.scale(sx, sy)
-        Gdk.cairo_set_source_pixbuf(cr, pixbuf, 0, 0)
-        cr.paint()
-        cr.restore()
-
-    @property
-    def bounding(self):
-        x0, y0 = self.x0, self.y0
-        return x0, y0 - self.h, x0 + self.w, y0
-
-
-class EllipseShape(Shape):
-
-    def __init__(self, pen, x0, y0, w, h, filled=False):
-        Shape.__init__(self)
-        self.pen = pen.copy()
-        self.x0 = x0
-        self.y0 = y0
-        self.w = w
-        self.h = h
-        self.filled = filled
-
-    def _draw(self, cr, highlight, bounding):
-        cr.save()
-        cr.translate(self.x0, self.y0)
-        cr.scale(self.w, self.h)
-        cr.move_to(1.0, 0.0)
-        cr.arc(0.0, 0.0, 1.0, 0, 2.0*math.pi)
-        cr.restore()
-        pen = self.select_pen(highlight)
-        if self.filled:
-            cr.set_source_rgba(*pen.fillcolor)
-            cr.fill()
-        else:
-            cr.set_dash(pen.dash)
-            cr.set_line_width(pen.linewidth)
-            cr.set_source_rgba(*pen.color)
-            cr.stroke()
-
-    @property
-    def bounding(self):
-        x0, y0, w, h = self.x0, self.y0, self.w, self.h
-        bt = 0 if self.filled else self.pen.linewidth / 2.
-        w, h = w + bt, h + bt
-        return x0 - w, y0 - h, x0 + w, y0 + h
-
 
 class PolygonShape(Shape):
 
@@ -424,9 +383,19 @@ class BezierShape(Shape):
             cr.set_source_rgba(*pen.color)
             cr.stroke()
 
+class Jump(object):
 
-class CompoundShape(Shape):
+    def __init__(self, item, x, y, highlight=None):
+        self.item = item
+        self.x = x
+        self.y = y
+        if highlight is None:
+            highlight = set([item])
+        self.highlight = highlight
 
+
+class Element(Shape):
+    
     def __init__(self, shapes):
         Shape.__init__(self)
         self.shapes = shapes
@@ -444,40 +413,9 @@ class CompoundShape(Shape):
             if shape.search_text(regexp):
                 return True
         return False
-
-
-class Url(object):
-
-    def __init__(self, item, url, highlight=None):
-        self.item = item
-        self.url = url
-        if highlight is None:
-            highlight = set([item])
-        self.highlight = highlight
-
-
-class Jump(object):
-
-    def __init__(self, item, x, y, highlight=None):
-        self.item = item
-        self.x = x
-        self.y = y
-        if highlight is None:
-            highlight = set([item])
-        self.highlight = highlight
-
-
-class Element(CompoundShape):
-    """Base class for graph nodes and edges."""
-
-    def __init__(self, shapes):
-        CompoundShape.__init__(self, shapes)
-
+    
     def is_inside(self, x, y):
         return False
-
-    def get_url(self, x, y):
-        return None
 
     def get_jump(self, x, y):
         return None
@@ -485,7 +423,7 @@ class Element(CompoundShape):
 
 class Node(Element):
 
-    def __init__(self, id, x, y, w, h, shapes, url):
+    def __init__(self, id, x, y, w, h, shapes):
         Element.__init__(self, shapes)
 
         self.id = id
@@ -497,18 +435,26 @@ class Node(Element):
         self.x2 = x + 0.5*w
         self.y2 = y + 0.5*h
 
-        self.url = url
-        self.statements = []
+        # statement ids to TextShape map. Used when removing statements in
+        # conflict mode.
+        self.statements = {}
+
+        if shapes is not None:
+            for shape in shapes:
+                if isinstance(shape, TextShape):
+                    self.statements[shape.statement_id] = shape
+
+        self.label = ""
+        for shape in self.statements.values():
+            self.label += shape.text + "\n"
+        
+        self.label = self.label[:-1]
+        # print("Node: ", self.id, "Label: ", self.label)
+        
         
     def is_inside(self, x, y):
         return self.x1 <= x and x <= self.x2 and self.y1 <= y and y <= self.y2
-
-    def get_url(self, x, y):
-        if self.url is None:
-            return None
-        if self.is_inside(x, y):
-            return Url(self, self.url)
-        return None
+       
 
     def get_jump(self, x, y):
         if self.is_inside(x, y):
@@ -563,7 +509,7 @@ class Graph(Shape):
 
     def __init__(self, width=1, height=1, shapes=(), nodes=(), edges=(), outputorder='breadthfirst'):
         Shape.__init__(self)
-
+        self.hideConflictNodes = True
         self.width = width
         self.height = height
         self.shapes = shapes
@@ -592,17 +538,19 @@ class Graph(Shape):
         for node in self.nodes:
             if bounding is None or node._intersects(bounding):
                 highlightOn = node in highlight_items
-                if highlightOn:
+                if highlightOn and self.hideConflictNodes:
                     conflictNode = node
                 else:
+                    # add highlighting code
                     node._draw(cr, highlight=False, bounding=bounding)
+                   
         if conflictNode is not None:
             self._drawConflictNodes(cr, conflictNode, bounding=bounding)
 
     def _drawConflictNodes(self, cr, node, bounding):
         nodesToHighlightIds =[x for x in self.conflictingNodes[int(node.id.decode("utf-8"))]]
         print("Highlighting these nodes as well: ", nodesToHighlightIds)
-        nodesToHighlightIds.append(int(node.id.decode("utf-8")))
+        node._draw(cr, highlight=True, bounding=bounding)
         for n in self.nodes:
             if int(n.id.decode("utf-8")) in nodesToHighlightIds:
                 n._draw(cr, highlight=True, bounding=bounding)
@@ -644,13 +592,6 @@ class Graph(Shape):
         for edge in self.edges:
             if edge.is_inside(x, y):
                 return edge
-
-    def get_url(self, x, y):
-        for node in self.nodes:
-            url = node.get_url(x, y)
-            if url is not None:
-                return url
-        return None
 
     def get_jump(self, x, y):
         for edge in self.edges:

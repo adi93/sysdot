@@ -20,6 +20,8 @@ import re
 import subprocess
 import sys
 import time
+from enum import Enum
+
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -42,8 +44,16 @@ from ..dot.parser import XDotParser
 from . import animation
 from . import actions
 from .elements import Graph
+from .elements import Node
 
-from ..conflicts import mapper 
+
+from ..conflicts import mapper
+from ..conflicts import dotCreater 
+
+class ConflictMode(Enum):
+    CONFLICT_MODE_OFF = 1
+    CONFLICT_SELECTION = 2
+    CONFLICT_MODE_ON = 3
 
 
 class DotWidget(Gtk.DrawingArea):
@@ -59,8 +69,8 @@ class DotWidget(Gtk.DrawingArea):
     filter = 'dot'
 
     def set_conflict_graph(self, conflictGraph):
-        self.conflictNodes = conflictGraph
-        self.graph.conflictingNodes = self.conflictNodes
+        self.conflict_nodes = conflictGraph
+        self.graph.set_conflicting_nodes(conflictGraph)
 
 
     
@@ -68,9 +78,12 @@ class DotWidget(Gtk.DrawingArea):
         Gtk.DrawingArea.__init__(self)
 
         self.graph = Graph()
+        self.graph.hideConflictNodes = True
         self.openfilename = None
-        self.conflictNodes = None
         self.set_can_focus(True)
+        self.conflict_nodes = {}
+        self.conflictMode = ConflictMode.CONFLICT_MODE_OFF
+        self.markNodes = []
 
         self.connect("draw", self.on_draw)
         self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK |
@@ -107,6 +120,16 @@ class DotWidget(Gtk.DrawingArea):
     def set_filter(self, filter):
         self.filter = filter
 
+    def turnOffConflictMode(self):
+        self.conflictMode = ConflictMode.CONFLICT_MODE_OFF
+        self.graph = self.original_graph
+        self.markNodes = []
+        self.graph.hideConflictNodes = True
+
+    def turnOnConflictMode(self):
+        self.conflictMode = ConflictMode.CONFLICT_SELECTION
+        self.graph.hideConflictNodes = False
+    
     def run_filter(self, dotcode):
         if not self.filter:
             return dotcode
@@ -133,7 +156,7 @@ class DotWidget(Gtk.DrawingArea):
             return None
         return xdotcode
 
-    def _set_dotcode(self, dotcode, filename=None, center=True):
+    def _set_dotcode(self, dotcode, center=True):
         # By default DOT language is UTF-8, but it accepts other encodings
         assert isinstance(dotcode, bytes)
         xdotcode = self.run_filter(dotcode)
@@ -149,7 +172,7 @@ class DotWidget(Gtk.DrawingArea):
 
     def set_dotcode(self, dotcode, filename=None, center=True):
         self.openfilename = None
-        if self._set_dotcode(dotcode, filename, center=center):
+        if self._set_dotcode(dotcode, center=center):
             if filename is None:
                 self.last_mtime = None
             else:
@@ -157,17 +180,33 @@ class DotWidget(Gtk.DrawingArea):
             self.openfilename = filename
             return True
 
+    def create_new_graph(self):
+        if 1:
+            self.markNodes = dotCreater.bfs(self.graph, self.markNodes)
+        selectiveDotcode = dotCreater.truncatedGraphList(self.graph, self.markNodes)
+        self.graph = self.parse_graph_from_dotcode(selectiveDotcode)
+        self.graph.set_conflicting_nodes(self.conflict_nodes)
+        self.zoom_image(self.zoom_ratio, center=True)
+
+
+    def parse_graph_from_dotcode(self, dotcode: bytes):
+        xdotcode = self.run_filter(dotcode)
+        parser = XDotParser(xdotcode)
+        return parser.parse()
+        
     def set_xdotcode(self, xdotcode, center=True):
         assert isinstance(xdotcode, bytes)
         parser = XDotParser(xdotcode)
-        self.graph = parser.parse()        
+        self.graph = parser.parse()
+        self.graph.set_conflicting_nodes(self.conflict_nodes)
+        self.original_graph = self.graph
         self.zoom_image(self.zoom_ratio, center=center)
 
     def reload(self):
         if self.openfilename is not None:
             try:
                 fp = open(self.openfilename, 'rb')
-                self._set_dotcode(fp.read(), self.openfilename, center=False)
+                self._set_dotcode(fp.read(), self.openfilename, False)
                 fp.close()
             except IOError:
                 pass
@@ -409,24 +448,30 @@ class DotWidget(Gtk.DrawingArea):
         return False
 
     def on_area_button_release(self, area, event):
+        """
+        This part is responsible for what happens when a node is clicked
+        """
         self.drag_action.on_button_release(event)
         self.drag_action = actions.NullAction(self)
         x, y = int(event.x), int(event.y)
         if self.is_click(event):
             el = self.get_element(x, y)
-            if self.on_click(el, event):
-                return True
+            if self.conflictMode == ConflictMode.CONFLICT_MODE_OFF:
+                if self.on_click(el, event):
+                    return True
 
-            if event.button == 1:
-                url = self.get_url(x, y)
-                if url is not None:
-                    self.emit('clicked', url.url, event)
-                else:
+                if event.button == 1:
                     jump = self.get_jump(x, y)
                     if jump is not None:
                         self.animate_to(jump.x, jump.y)
 
-                return True
+                    return True
+            elif self.conflictMode == ConflictMode.CONFLICT_SELECTION:
+                if isinstance(el, Node):
+                    self.markNodes.append(el.id)
+            elif self.conflictMode == ConflictMode.CONFLICT_MODE_ON:
+                pass
+                # do nothing
 
         if event.button == 1 or event.button == 2:
             return True
@@ -499,9 +544,6 @@ class DotWidget(Gtk.DrawingArea):
         x, y = self.window2graph(x, y)
         return self.graph.get_element(x, y)
 
-    def get_url(self, x, y):
-        x, y = self.window2graph(x, y)
-        return self.graph.get_url(x, y)
 
     def get_jump(self, x, y):
         x, y = self.window2graph(x, y)
@@ -531,7 +573,11 @@ class DotWindow(Gtk.Window):
             <toolitem action="ZoomOut"/>
             <toolitem action="ZoomFit"/>
             <toolitem action="Zoom100"/>
+            <separator/>
             <toolitem action="AddConflictFile" />
+            <separator/>
+            <toolitem action="ConflictModeOn" />
+            <toolitem action="ConfirmSelection" />
             <separator/>
             <toolitem name="Find" action="Find"/>
         </toolbar>
@@ -577,7 +623,11 @@ class DotWindow(Gtk.Window):
             ('ZoomFit', Gtk.STOCK_ZOOM_FIT, None, None, None, self.dotwidget.on_zoom_fit),
             ('Zoom100', Gtk.STOCK_ZOOM_100, None, None, None, self.dotwidget.on_zoom_100),
             ('AddConflictFile', Gtk.STOCK_OPEN, None, None, 
-             "Adds a conflict file", self.on_open_conflict_file)
+             "Adds a conflict file", self.on_open_conflict_file),
+            ('ConflictModeOn', Gtk.STOCK_CONVERT, None, None,
+             "Turn on node selection", self.on_mark_nodes),
+            ('ConfirmSelection', Gtk.STOCK_CONVERT, None, None,
+             "Confirm Selection", self.on_confirm_marking_nodes)
         ))
 
         self.back_action = Gtk.Action('Back', None, None, Gtk.STOCK_GO_BACK)
@@ -603,7 +653,7 @@ class DotWindow(Gtk.Window):
         # Create a Toolbar
         toolbar = uimanager.get_widget('/ToolBar')
         vbox.pack_start(toolbar, False, False, 0)
-
+        
         vbox.pack_start(self.dotwidget, True, True, 0)
 
         self.last_open_dir = "."
@@ -617,8 +667,8 @@ class DotWindow(Gtk.Window):
         find_toolitem.add(self.textentry)
 
         self.textentry.set_activates_default(True)
-        self.textentry.connect("activate", self.textentry_activate, self.textentry);
-        self.textentry.connect("changed", self.textentry_changed, self.textentry);
+        self.textentry.connect("activate", self.textentry_activate, self.textentry)
+        self.textentry.connect("changed", self.textentry_changed, self.textentry)
 
         self.show_all()
 
@@ -679,6 +729,18 @@ class DotWindow(Gtk.Window):
             fp.close()
         except IOError as ex:
             self.error_dialog(str(ex))
+
+    def on_confirm_marking_nodes(self, action):
+        self.dotwidget.create_new_graph()
+
+    def on_mark_nodes(self, action):
+        if self.dotwidget.conflictMode is ConflictMode.CONFLICT_MODE_OFF:
+            self.dotwidget.turnOnConflictMode()
+        elif self.dotwidget.conflictMode == ConflictMode.CONFLICT_MODE_OFF or self.dotwidget.conflictMode == ConflictMode.CONFLICT_SELECTION:
+            self.dotwidget.turnOffConflictMode()
+            
+            
+
 
     def on_open_conflict_file(self, action):
         chooser = Gtk.FileChooserDialog(parent=self,
@@ -748,7 +810,7 @@ class DotWindow(Gtk.Window):
         dlg.set_title(self.base_title)
         dlg.run()
         dlg.destroy()
-
+    
     def on_history(self, action, has_back, has_forward):
         self.back_action.set_sensitive(has_back)
         self.forward_action.set_sensitive(has_forward)
