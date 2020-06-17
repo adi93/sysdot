@@ -570,12 +570,17 @@ class Graph(Shape):
             self._drawConflictNodes(cr, conflictNode, bounding=bounding)
 
     def _drawConflictNodes(self, cr, node, bounding):
-        nodesToHighlightIds =[x for x in self.conflictingNodes[int(node.id.decode("utf-8"))]]
-        print("Highlighting these nodes as well: ", nodesToHighlightIds)
+        nodeId = int(node.id.decode("utf-8"))
         node._draw(cr, highlight=True, bounding=bounding)
-        for n in self.nodes:
-            if int(n.id.decode("utf-8")) in nodesToHighlightIds:
-                n._draw(cr, highlight=True, bounding=bounding)
+        
+        # only highlight the conflicting nodes if the conflict file is loaded, or has
+        # an entry for nodeId
+        if self.conflictingNodes.get(nodeId) is not None:
+            nodesToHighlightIds =[x for x in self.conflictingNodes[nodeId]]
+            print("Highlighting these nodes as well: ", nodesToHighlightIds)
+            for n in self.nodes:
+                if int(n.id.decode("utf-8")) in nodesToHighlightIds:
+                    n._draw(cr, highlight=True, bounding=bounding)
         
 
     def _draw_edges(self, cr, bounding, highlight_items):
