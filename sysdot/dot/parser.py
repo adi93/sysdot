@@ -16,13 +16,13 @@
 import colorsys
 import sys
 
-from xdot.dot.lexer import ParseError, DotLexer
+from sysdot.dot.lexer import ParseError, DotLexer
 
-from xdot.ui.colors import lookup_color
-from xdot.ui.pen import Pen
-from xdot.ui import elements
+from sysdot.ui.colors import lookup_color
+from sysdot.ui.pen import Pen
+from sysdot.ui import elements
 
-from xdot.dot.lexer import Lexer
+from sysdot.dot.lexer import Lexer
 
 
 EOF = -1
@@ -82,9 +82,7 @@ class Parser:
 
 
 class XDotAttrParser:
-    """Parser for xdot drawing attributes.
-    See also:
-    - http://www.graphviz.org/doc/info/output.html#d:xdot
+    """Parser for sysdot drawing attributes.
     """
 
     def __init__(self, parser, buf):
@@ -215,7 +213,7 @@ class XDotAttrParser:
                 points = self.read_polygon()
                 self.handle_polygon(points, filled=False)
             else:
-                sys.stderr.write("error: unknown xdot opcode '%s'\n" % op)
+                sys.stderr.write("error: unknown sysdot opcode '%s'\n" % op)
                 sys.exit(1)
 
         return self.shapes
@@ -430,13 +428,13 @@ class XDotParser(DotParser):
         if self.top_graph:
             # Check xdot version
             try:
-                xdotversion = attrs['xdotversion']
+                sysdotversion = attrs['sysdotversion']
             except KeyError:
                 pass
             else:
-                if float(xdotversion) > float(self.XDOTVERSION):
-                    sys.stderr.write('warning: xdot version %s, but supported is %s\n' %
-                                     (xdotversion, self.XDOTVERSION))
+                if float(sysdotversion) > float(self.XDOTVERSION):
+                    sys.stderr.write('warning: sysdot version %s, but supported is %s\n' %
+                                     (sysdotversion, self.XDOTVERSION))
 
             # Parse output order
             try:

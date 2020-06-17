@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# The purpose of this script is to enable uploading xdot.py to the Python
+# The purpose of this script is to enable uploading sysdot.py to the Python
 # Package Index, which can be easily done by doing:
 #
 #   python3 setup.py sdist upload
@@ -13,26 +13,20 @@
 from setuptools import setup
 
 setup(
-    name='xdot',
+    name='sysdot',
     version='1.1',
-    author='Jose Fonseca',
-    author_email='jose.r.fonseca@gmail.com',
-    url='https://github.com/jrfonseca/xdot.py',
-    description="Interactive viewer for Graphviz dot files",
+    author='Aditya Harit',
+    author_email='adityah@uci.edu',
+    description="Interactive viewer for (RISC) Graphviz dot files",
     long_description="""
-        xdot.py is an interactive viewer for graphs written in Graphviz's dot
-        language.
+        sysdot.py is a modification of the xdot tool written by Jose Fonseca.
 
-        It uses internally the graphviz's xdot output format as an intermediate
-        format, and PyGTK and Cairo for rendering.
-
-        xdot.py can be used either as a standalone application from command
-        line, or as a library embedded in your python application.
+        It is tailored towards visualizing conflict graphs for RISC compiler.
         """,
     license="LGPL",
 
-    packages=['xdot', 'xdot/dot', 'xdot/ui'],
-    entry_points=dict(gui_scripts=['xdot=xdot.__main__:main']),
+    packages=['sysdot', 'sysdot/dot', 'sysdot/ui', 'sysdot/conflict'],
+    entry_points=dict(gui_scripts=['sysdot=sysdot.__main__:main']),
 
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[

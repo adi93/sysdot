@@ -28,7 +28,7 @@ from gi.repository import Pango
 from gi.repository import PangoCairo
 import cairo
 
-from xdot.ui.pen import Pen
+from sysdot.ui.pen import Pen
 
 from typing import Tuple
 from typing import List
@@ -55,7 +55,7 @@ class Shape:
         x2, y2, x3, y3 = self.bounding
         return x0 <= x2 and x3 <= x1 and y0 <= y2 and y3 <= y1
 
-    def _draw(self, cr, highlight, bounding:Tuple[int, int, int, int]):
+    def _draw(self, cr, highlight, bounding:Tuple[int, int, int, int], color=None):
         """Actual draw implementation"""
         raise NotImplementedError
 
@@ -142,7 +142,7 @@ class TextShape(Shape):
         """
         return hash(str(self.x) + str(self.y) + self.text)
 
-    def _draw(self, cr, highlight, bounding):
+    def _draw(self, cr, highlight, bounding, color=None):
 
         try:
             layout = self.layout
@@ -227,7 +227,10 @@ class TextShape(Shape):
 
             cr.save()
             cr.scale(f, f)
-            cr.set_source_rgba(*self.select_pen(highlight).color)
+            if color is None:
+                cr.set_source_rgba(*self.select_pen(highlight).color)
+            else:
+                cr.set_source_rgba(*color)
             PangoCairo.show_layout(cr, layout)
             cr.restore()
 
@@ -259,7 +262,7 @@ class PolygonShape(Shape):
         bt = 0 if self.filled else self.pen.linewidth / 2.
         self.bounding = x0 - bt, y0 - bt, x1 + bt, y1 + bt
 
-    def _draw(self, cr, highlight, bounding):
+    def _draw(self, cr, highlight, bounding,color=None):
         x0, y0 = self.points[-1]
         cr.move_to(x0, y0)
         for x, y in self.points:
@@ -288,7 +291,7 @@ class LineShape(Shape):
         bt = self.pen.linewidth / 2.
         self.bounding = x0 - bt, y0 - bt, x1 + bt, y1 + bt
 
-    def _draw(self, cr, highlight, bounding):
+    def _draw(self, cr, highlight, bounding, color=None):
         x0, y0 = self.points[0]
         cr.move_to(x0, y0)
         for x1, y1 in self.points[1:]:
@@ -296,7 +299,10 @@ class LineShape(Shape):
         pen = self.select_pen(highlight)
         cr.set_dash(pen.dash)
         cr.set_line_width(pen.linewidth)
-        cr.set_source_rgba(*pen.color)
+        if color is None:
+            cr.set_source_rgba(*pen.color)
+        else:
+            cr.set_source_rgba(*color)
         cr.stroke()
 
 
@@ -366,7 +372,7 @@ class BezierShape(Shape):
         u = 1 - t
         return p0*(u**3) + 3*t*u*(p1*u + p2*t) + p3*(t**3)
 
-    def _draw(self, cr, highlight, bounding):
+    def _draw(self, cr, highlight, bounding,color=None):
         x0, y0 = self.points[0]
         cr.move_to(x0, y0)
         for i in range(1, len(self.points), 3):
@@ -401,7 +407,7 @@ class Element(Shape):
         self.shapes = shapes
         self.bounding = Shape._envelope_bounds(map(_get_bounding, self.shapes))
 
-    def _draw(self, cr, highlight, bounding):
+    def _draw(self, cr, highlight, bounding, color=None):
         if bounding is not None and self._fully_in(bounding):
             bounding = None
         for shape in self.shapes:
@@ -464,6 +470,13 @@ class Node(Element):
     def __repr__(self):
         return "<Node %s>" % self.id
 
+    
+    def draw(self, cr, highlight, bounding, color=(0.0, 0.0, 1.0, 1.0)):
+        if bounding is not None and self._fully_in(bounding):
+            bounding = None
+        for shape in self.shapes:
+            if bounding is None or shape._intersects(bounding):
+                shape._draw(cr, highlight, bounding, color)
 
 def square_distance(x1, y1, x2, y2):
     deltax = x2 - x1
@@ -517,6 +530,10 @@ class Graph(Shape):
         self.edges = edges
         self.outputorder = outputorder
         self.conflictingNodes = {}
+
+        # when in selection mode, we need to highlight the already selected nodes.
+        self.selectedNodes = set()
+        
         self.bounding = Shape._envelope_bounds(
             map(_get_bounding, self.shapes),
             map(_get_bounding, self.nodes),
@@ -538,11 +555,16 @@ class Graph(Shape):
         for node in self.nodes:
             if bounding is None or node._intersects(bounding):
                 highlightOn = node in highlight_items
-                if highlightOn and self.hideConflictNodes:
-                    conflictNode = node
+                if highlightOn:
+                    if self.hideConflictNodes:
+                        conflictNode = node
+                    else:
+                        node._draw(cr, highlight=True, bounding=bounding)
                 else:
-                    # add highlighting code
-                    node._draw(cr, highlight=False, bounding=bounding)
+                    if node.id in self.selectedNodes:
+                        node.draw(cr, highlight=False, bounding=bounding, color=(0.0, 0.0, 1.0, 1.0))
+                    else:
+                        node._draw(cr, highlight=False, bounding=bounding)
                    
         if conflictNode is not None:
             self._drawConflictNodes(cr, conflictNode, bounding=bounding)

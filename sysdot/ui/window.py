@@ -83,7 +83,6 @@ class DotWidget(Gtk.DrawingArea):
         self.set_can_focus(True)
         self.conflict_nodes = {}
         self.conflictMode = ConflictMode.CONFLICT_MODE_OFF
-        self.markNodes = []
 
         self.connect("draw", self.on_draw)
         self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK |
@@ -123,7 +122,7 @@ class DotWidget(Gtk.DrawingArea):
     def turnOffConflictMode(self):
         self.conflictMode = ConflictMode.CONFLICT_MODE_OFF
         self.graph = self.original_graph
-        self.markNodes = []
+        self.graph.selectedNodes = set()
         self.graph.hideConflictNodes = True
 
     def turnOnConflictMode(self):
@@ -182,8 +181,8 @@ class DotWidget(Gtk.DrawingArea):
 
     def create_new_graph(self):
         if 1:
-            self.markNodes = dotCreater.bfs(self.graph, self.markNodes)
-        selectiveDotcode = dotCreater.truncatedGraphList(self.graph, self.markNodes)
+            dotCreater.bfs(self.graph)
+        selectiveDotcode = dotCreater.truncatedGraphList(self.graph, self.graph.selectedNodes)
         self.graph = self.parse_graph_from_dotcode(selectiveDotcode)
         self.graph.set_conflicting_nodes(self.conflict_nodes)
         self.zoom_image(self.zoom_ratio, center=True)
@@ -206,7 +205,7 @@ class DotWidget(Gtk.DrawingArea):
         if self.openfilename is not None:
             try:
                 fp = open(self.openfilename, 'rb')
-                self._set_dotcode(fp.read(), self.openfilename, False)
+                self._set_dotcode(fp.read(), False)
                 fp.close()
             except IOError:
                 pass
@@ -468,7 +467,7 @@ class DotWidget(Gtk.DrawingArea):
                     return True
             elif self.conflictMode == ConflictMode.CONFLICT_SELECTION:
                 if isinstance(el, Node):
-                    self.markNodes.append(el.id)
+                    self.graph.selectedNodes.add(el.id)
             elif self.conflictMode == ConflictMode.CONFLICT_MODE_ON:
                 pass
                 # do nothing
@@ -738,6 +737,8 @@ class DotWindow(Gtk.Window):
             self.dotwidget.turnOnConflictMode()
         elif self.dotwidget.conflictMode == ConflictMode.CONFLICT_MODE_OFF or self.dotwidget.conflictMode == ConflictMode.CONFLICT_SELECTION:
             self.dotwidget.turnOffConflictMode()
+            self.dotwidget.zoom_image(self.dotwidget.zoom_ratio, center=True)
+
             
             
 

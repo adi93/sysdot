@@ -38,7 +38,8 @@ def truncatedGraphListOld(graph, nodes):
     s = dot.source
     return bytes(s, "utf-8")
 
-def bfs(graph, nodes):
+def bfs(graph):
+    nodes = graph.selectedNodes
     exploredNodes = set()
     for n in nodes:
         q = queue.Queue()
@@ -52,7 +53,7 @@ def bfs(graph, nodes):
                 if dest not in exploredNodes:
                     q.put(dest)
     
-    return exploredNodes
+    graph.selectedNodes = exploredNodes
 
 
 
