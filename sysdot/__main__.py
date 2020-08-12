@@ -25,7 +25,7 @@ from .ui.window import DotWindow, Gtk
 def main():
 
     parser = argparse.ArgumentParser(
-        description="xdot.py is an interactive viewer for graphs written in Graphviz's dot language.",
+        description="sysdot.py is an interactive viewer for graphs written in Graphviz's dot language.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Shortcuts:

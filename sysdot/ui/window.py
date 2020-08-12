@@ -77,6 +77,7 @@ class DotWidget(Gtk.DrawingArea):
     def __init__(self):
         Gtk.DrawingArea.__init__(self)
 
+        self.set_hexpand(True)
         self.graph = Graph()
         self.graph.hideConflictNodes = True
         self.openfilename = None
@@ -555,6 +556,42 @@ class FindMenuToolAction(Gtk.Action):
     def do_create_tool_item(self):
         return Gtk.ToolItem()
 
+class SideBar(Gtk.ScrolledWindow):
+    def __init__(self, nodes, widget=None):
+        Gtk.ScrolledWindow.__init__(self)
+
+        self.store = Gtk.ListStore(str)
+        self.nodes = {}
+        for node in nodes:
+            self.store.append([node])
+
+        self.dotwidget = widget
+        # self.node_filter = self.store.filter_new()
+        # self.node_filter.set_visible_func(self.node_filter_func)
+
+        self.treeview = Gtk.TreeView(self.store)
+        for i, column_title in enumerate(["Nodes"]):
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(column_title, renderer, text=i)
+            self.treeview.append_column(column)
+
+        self.set_vexpand(True)
+        self.set_border_width(5)
+        self.add(self.treeview)
+
+        self.set_hexpand(True)
+        self.show_all()
+    
+    def set_nodes(self, nodes):
+        self.nodes.clear()
+        self.store.clear()
+        for node in nodes:
+            label = node.label[:node.label.index('\n')]
+            self.store.append([label])
+            self.nodes[label] = node
+
+    def on_node_click(self, ):
+        pass
 
 class DotWindow(Gtk.Window):
 
@@ -651,9 +688,24 @@ class DotWindow(Gtk.Window):
 
         # Create a Toolbar
         toolbar = uimanager.get_widget('/ToolBar')
+
+        # Create sidebar
+        self.sidebar = SideBar([('Node 0'), ('Node 1'), ('Node 2')])
+
+        self.grid = Gtk.Grid()
+        self.grid.attach(self.sidebar, 0, 0, 1, 1)
+        self.grid.attach(self.dotwidget, 1, 0, 4, 1)
+        # self.hbox = Gtk.HBox()
+        # self.hbox.pack_start(self.sidebar, True, True, 0)
+        # self.hbox.pack_start(self.dotwidget, True, True, 0)
+
         vbox.pack_start(toolbar, False, False, 0)
+        vbox.pack_start(self.grid, True, True, 0)
+        # vbox.pack_start(self.hbox, True, True, 0)
+
+        # vbox.pack_start(toolbar, False, False, 0)
         
-        vbox.pack_start(self.dotwidget, True, True, 0)
+        # vbox.pack_start(self.dotwidget, True, True, 0)
 
         self.last_open_dir = "."
 
@@ -709,6 +761,10 @@ class DotWindow(Gtk.Window):
         if self.dotwidget.set_dotcode(dotcode, filename):
             self.update_title(filename)
             self.dotwidget.zoom_to_fit()
+        
+        ## After setting the dotcode, update the sidebar
+        nodes = self.dotwidget.graph.nodes
+        self.sidebar.set_nodes(nodes)
 
     def set_xdotcode(self, xdotcode, filename=None):
         if self.dotwidget.set_xdotcode(xdotcode):
@@ -772,7 +828,6 @@ class DotWindow(Gtk.Window):
     def load_conflict_file(self, fileName: str):
         conflictGraph = mapper.generateMap(fileName)
         self.dotwidget.set_conflict_graph(conflictGraph)
-        print("loaded file")
 
     def on_open(self, action):
         chooser = Gtk.FileChooserDialog(parent=self,
