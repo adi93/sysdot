@@ -1,5 +1,3 @@
-
-
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('PangoCairo', '1.0')
@@ -8,7 +6,7 @@ from gi.repository import GLib
 from gi.repository import GObject
 from gi.repository import Gtk
 from gi.repository import Gdk
-class SideBar(Gtk.Notebook):
+class SideBar(Gtk.Revealer):
     __gsignals__ = {
 
         ## Signal that is emitted by the drawing area when a node is clicked.
@@ -16,8 +14,10 @@ class SideBar(Gtk.Notebook):
     }
 
     def __init__(self, nodes=None, edges=None, widget=None):
-        Gtk.Notebook.__init__(self)
+        Gtk.Revealer.__init__(self)
 
+        notebook = Gtk.Notebook.new()
+        # self.set_expanded(True)
         # consts for columns
         self.TEXT_COL=0
         self.ID_COL=1
@@ -43,7 +43,7 @@ class SideBar(Gtk.Notebook):
 
         childViewWindow = Gtk.ScrolledWindow.new()
         childViewWindow.add(self.childTreeview)
-        self.append_page(childViewWindow, Gtk.Label(label="Adjacent nodes"))
+        notebook.append_page(childViewWindow, Gtk.Label(label="Adjacent nodes"))
 
         # conflict nodes
         self.conflictTreeview = Gtk.TreeView.new()
@@ -54,14 +54,25 @@ class SideBar(Gtk.Notebook):
 
         conflictViewWindow = Gtk.ScrolledWindow.new()
         conflictViewWindow.add(self.conflictTreeview)
-        self.append_page(conflictViewWindow, Gtk.Label(label="Conflict nodes"))
+        notebook.append_page(conflictViewWindow, Gtk.Label(label="Conflict nodes"))
 
         self.set_vexpand(True)
         self.set_border_width(5)
+        self.add(notebook)
+        self.set_reveal_child(True)
 
         self.set_hexpand(True)
         self.show_all()
     
+    def toggleVisibility(self):
+        if self.get_child_revealed():
+            self.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT)
+            self.set_reveal_child(False)
+        else:
+            self.set_transition_type(Gtk.RevealerTransitionType.SLIDE_RIGHT)
+            self.set_reveal_child(True)
+
+
     def on_highlighted(self, event, nodeId, conflictNodes=None):
         """
         When a node is clicked in the dotwidget area, this method scrolls to the corresponding
