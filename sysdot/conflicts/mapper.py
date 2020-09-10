@@ -2,6 +2,9 @@ from bs4 import BeautifulSoup as bs
 from typing import List, Set, Dict, Tuple, Optional
 
 def generateMap(fileName: str) -> Dict[int, List[int]]:
+    """
+    returns a dictionary of nodeId to list of nodeId which the key node is in conflict in
+    """
     import re    
     def getTags(taggedString: str) -> (int, int):
         p = re.compile(r"\((\d*),\d\)")

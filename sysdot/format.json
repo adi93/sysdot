@@ -1,0 +1,26 @@
+{
+    "baseGraph": {
+        "nodes": {
+
+        },
+        "edges": {
+
+        }
+    },
+    "currentGraph": {
+        "conflictModeConfig": true,
+        "nodes": {
+
+        },
+        "edges": {
+
+        }
+    },
+    "windowParameters": {
+        "zoomRatio":1,
+        "sizeX": 400,
+        "sizeY": 400, 
+        "x":240,
+        "y":360
+    }
+}

@@ -25,23 +25,13 @@ def parseNodes(nodes: str) -> Set[int]:
     return uniqueNodes
 
 
-
-def truncatedGraphListOld(graph, nodes):
-    """
-    Takes a graph, and returns a corresponding dot source for it
-    Only the nodes in nodes are included in the graph
-    """
-    dot = Digraph(comment='New graph')
-    for n in graph.nodes:
-        if n.id in nodes:
-            dot.node(name = n.id.decode("utf-8"), label=n.label)
-    s = dot.source
-    return bytes(s, "utf-8")
-
 def bfs(graph):
-    nodes = graph.selectedNodes
+    """
+    Modifies the graph. Takes the graph's selectedNodes, and returns all the 
+    nodes that are reachable by those selectedNodes.
+    """
     exploredNodes = set()
-    for n in nodes:
+    for n in graph.selectedNodes:
         q = queue.Queue()
         q.put(n)
         while q.empty() is False:
@@ -56,13 +46,10 @@ def bfs(graph):
     graph.selectedNodes = exploredNodes
 
 
-
-
-
-def truncatedGraphList(graph, nodes):
+def truncatedGraphList(graph, selectedNodes):
     """
     Takes a graph, and returns a corresponding dot source for it
-    Only the nodes in nodes are included in the graph
+    Only the nodes in selectedNodes are included in the graph
     """
     dot = """
     digraph G {
@@ -70,13 +57,13 @@ def truncatedGraphList(graph, nodes):
 
     """
     for n in graph.nodes:
-        if n.id in nodes:
+        if n.id in selectedNodes:
             nodeString = n.id.decode("utf-8") + "[shape=record,label=\"{" + n.label.replace('\n', "\l|") + "\l}\"];\n"
             dot += nodeString
     dot = dot.replace('>', "&gt;").replace('<', "&lt;").replace('||', " &#124;&#124;")
 
     for edge in graph.edges:
-        if edge.src.id in nodes and edge.dst.id in nodes:
+        if edge.src.id in selectedNodes and edge.dst.id in selectedNodes:
             dot += edge.src.id.decode("utf-8") + "->" + edge.dst.id.decode("utf-8") + " ;\n"
 
     dot += "}\n"

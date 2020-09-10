@@ -234,7 +234,7 @@ class TextShape(Shape):
             PangoCairo.show_layout(cr, layout)
             cr.restore()
 
-        if 1:  # DEBUG
+        if 0:  # DEBUG
             # show where dot thinks the text should appear
             cr.set_source_rgba(1, 0, 0, .9)
             x = self.x - 0.5 * (1 + self.j) * width
@@ -577,7 +577,7 @@ class Graph(Shape):
         # an entry for nodeId
         if self.conflictingNodes.get(nodeId) is not None:
             nodesToHighlightIds =[x for x in self.conflictingNodes[nodeId]]
-            print("Highlighting these nodes as well: ", nodesToHighlightIds)
+            # print("Highlighting these nodes as well: ", nodesToHighlightIds)
             for n in self.nodes:
                 if int(n.id.decode("utf-8")) in nodesToHighlightIds:
                     n._draw(cr, highlight=True, bounding=bounding)
