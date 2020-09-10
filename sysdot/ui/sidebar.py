@@ -80,7 +80,8 @@ class SideBar(Gtk.Revealer):
         TODO: Also highlight conflictNodes?
         """
 
-        treeview = self.get_nth_page(self.get_current_page()).get_child()
+        notebook = self.get_child()
+        treeview = notebook.get_nth_page(notebook.get_current_page()).get_child()
         store = treeview.get_model()
         nodeIter = store.get_iter_first()
         while nodeIter is not False and nodeIter is not None:
