@@ -26,9 +26,9 @@ from ..conflicts import mapper
 from ..conflicts import dotCreater 
 
 class ConflictMode(Enum):
-    CONFLICT_MODE_OFF = 1
-    CONFLICT_SELECTION = 2
-    CONFLICT_MODE_ON = 3
+    OFF = 1
+    SELECTION = 2
+    ON = 3
 
 class DotWidget(Gtk.DrawingArea):
     """GTK widget that draws dot graphs."""
@@ -56,12 +56,12 @@ class DotWidget(Gtk.DrawingArea):
         self.sidebar = None
         self.set_hexpand(True)
         self.graph = Graph()
-        self.graph.hideConflictNodes = True
+        self.graph.conflictModeOff = True
         self.openfilename = None
         self.set_can_focus(True)
         ## conflict_nodes is {int: list(int)}; id to list of ids
         self.conflict_nodes = {}
-        self.conflictMode = ConflictMode.CONFLICT_MODE_OFF
+        self.conflictMode = ConflictMode.OFF
 
         self.connect("draw", self.on_draw)
         self.connect("node-highlighted", self.on_node_highlighted)
@@ -100,25 +100,35 @@ class DotWidget(Gtk.DrawingArea):
     def set_filter(self, filter):
         self.filter = filter
 
-    def on_conflict_button_pressed(self, event):
-        """
-        Returns the button text, and
-        """
-        pass
+    def on_conflict_button_pressed(self, button):
+        if self.conflictMode is ConflictMode.OFF:
+            self.conflictMode = ConflictMode.SELECTION
+            self.graph.conflictModeOff = False
+            button.set_label("Confirm selection")
+        elif self.conflictMode is ConflictMode.SELECTION:
+            self.conflictMode = ConflictMode.ON
 
-    def turnOffConflictMode(self):
-        self.conflictMode = ConflictMode.CONFLICT_MODE_OFF
-        self.graph = self.original_graph
-        self.graph.selectedNodes = set()
-        self.graph.hideConflictNodes = True
+            dotCreater.bfs(self.graph)
+            selectiveDotcode = dotCreater.truncatedGraphList(self.graph, self.graph.selectedNodes)
+            self.graph = self.parse_graph_from_dotcode(selectiveDotcode)
+            self.graph.set_conflicting_nodes(self.conflict_nodes)
+            self.zoom_image(self.zoom_ratio, center=True)
 
-        ## reset sidebar as well
-        # self.sidebar.set_nodes_and_edges(self.graph)
+            ## also set sidebar things ?
+            # self.sidebar.set_nodes_and_edges(self.graph)
+            button.set_label("Revert back")
+        elif self.conflictMode is ConflictMode.ON:
+            self.conflictMode = ConflictMode.OFF
+            self.graph = self.original_graph
+            self.graph.selectedNodes = set()
+            self.graph.conflictModeOff = True
 
-    def turnOnConflictMode(self):
-        self.conflictMode = ConflictMode.CONFLICT_SELECTION
-        self.graph.hideConflictNodes = False
-    
+            self.zoom_image(self.zoom_ratio, center=True)
+
+            ## reset sidebar as well
+            # self.sidebar.set_nodes_and_edges(self.graph)
+            button.set_label("Select nodes")
+
     def run_filter(self, dotcode):
         if not self.filter:
             return dotcode
@@ -168,17 +178,6 @@ class DotWidget(Gtk.DrawingArea):
                 self.last_mtime = os.stat(filename).st_mtime
             self.openfilename = filename
             return True
-
-    def create_new_graph(self):
-        dotCreater.bfs(self.graph)
-        selectiveDotcode = dotCreater.truncatedGraphList(self.graph, self.graph.selectedNodes)
-        self.graph = self.parse_graph_from_dotcode(selectiveDotcode)
-        self.graph.set_conflicting_nodes(self.conflict_nodes)
-        self.zoom_image(self.zoom_ratio, center=True)
-
-        ## also set sidebar things ?
-        # self.sidebar.set_nodes_and_edges(self.graph)
-
 
     def parse_graph_from_dotcode(self, dotcode: bytes):
         xdotcode = self.run_filter(dotcode)
@@ -442,7 +441,7 @@ class DotWidget(Gtk.DrawingArea):
         if self.is_click(event):
             el = self.get_element(x, y)
 
-            if self.conflictMode == ConflictMode.CONFLICT_MODE_OFF:
+            if self.conflictMode is ConflictMode.OFF or self.conflictMode is ConflictMode.ON:
                 if isinstance(el, Node):
                     # pass on the nodeId and conflictNodes
                     nodeId = int(el.id)
@@ -454,11 +453,9 @@ class DotWidget(Gtk.DrawingArea):
                         self.animate_to(jump.x, jump.y)
 
                     return True
-            elif self.conflictMode == ConflictMode.CONFLICT_SELECTION:
+            elif self.conflictMode == ConflictMode.SELECTION:
                 if isinstance(el, Node):
                     self.graph.selectedNodes.add(el.id)
-            elif self.conflictMode == ConflictMode.CONFLICT_MODE_ON:
-                pass
                 # do nothing
 
         if event.button == 1 or event.button == 2:

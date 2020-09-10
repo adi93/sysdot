@@ -61,7 +61,7 @@ class FindMenuToolAction(Gtk.Action):
     def do_create_tool_item(self):
         return Gtk.ToolItem()
 
-class DotWindow(Gtk.Window):
+class DotWindow(Gtk.ApplicationWindow):
     base_title = 'Dot Viewer'
 
     def __init__(self, widget=None, width=512, height=512):
@@ -84,10 +84,15 @@ class DotWindow(Gtk.Window):
         header = self.createHeader()
         self.set_titlebar(header)
 
+        box = Gtk.VBox()
+        box.set_homogeneous(True)
+        # box.pack_start(header)
+
         self.pane = Gtk.HPaned(wide_handle=True) # makes for a better separator
         self.pane.pack1(self.sidebar, False, True)
         self.pane.pack2(self.dotwidget, True, False)
-        self.add(self.pane)
+        box.add(self.pane)
+        self.add(box)
 
         self.last_open_dir = "."
 
@@ -98,11 +103,11 @@ class DotWindow(Gtk.Window):
     def createHeader(self):
         header = Gtk.HeaderBar.new()  
 
-        def addButton(iconName, callback, tooltipText=None, sensitive=True, **properties):
+        def addButton(iconName, callback, tooltipText=None, **kwargs):
             button = Gtk.ToolButton(icon_widget=Gtk.Image.new_from_icon_name(iconName, Gtk.IconSize.SMALL_TOOLBAR))
             button.set_tooltip_text(tooltipText)
             button.connect("clicked", callback)
-            for propName, propVal in properties.items():
+            for propName, propVal in kwargs.items():
                 button.set_property(propName, propVal)
                 
             header.pack_start(button)
@@ -134,16 +139,19 @@ class DotWindow(Gtk.Window):
 
         # Conflict file operations
         addButton("image-loading", self.on_open_conflict_file, "Load a conflict file")
+        self.conflictButton = Gtk.ToolButton(label="Select nodes")
+        self.conflictButton.connect("clicked", self.dotwidget.on_conflict_button_pressed)
+        header.pack_start(self.conflictButton)
 
         # Add Find text search
-        find_toolitem = Gtk.ToolItem()
-        self.textentry = Gtk.Entry(max_length=20)
-        self.textentry.set_icon_from_stock(0, Gtk.STOCK_FIND)
-        find_toolitem.add(self.textentry)
-        self.textentry.set_activates_default(True)
-        self.textentry.connect("activate", self.textentry_activate, self.textentry)
-        self.textentry.connect("changed", self.textentry_changed, self.textentry)
-        header.pack_start(find_toolitem)
+        # find_toolitem = Gtk.ToolItem()
+        # self.textentry = Gtk.Entry(max_length=20)
+        # self.textentry.set_icon_from_stock(0, Gtk.STOCK_FIND)
+        # find_toolitem.add(self.textentry)
+        # self.textentry.set_activates_default(True)
+        # self.textentry.connect("activate", self.textentry_activate, self.textentry)
+        # self.textentry.connect("changed", self.textentry_changed, self.textentry)
+        # header.pack_start(find_toolitem)
 
         # show the standard 3 mnimize, maximize and close buttons
         header.set_show_close_button(True)
@@ -157,7 +165,7 @@ class DotWindow(Gtk.Window):
         found_items = []
         dot_widget = self.dotwidget
         regexp = re.compile(entry_text)
-        for element in dot_widget.graph.nodes + dot_widget.graph.edges:
+        for element in dot_widget.graph.nodes:
             if element.search_text(regexp):
                 found_items.append(element)
         return found_items
@@ -213,15 +221,6 @@ class DotWindow(Gtk.Window):
         except IOError as ex:
             self.error_dialog(str(ex))
 
-    def on_confirm_marking_nodes(self, action):
-        self.dotwidget.create_new_graph()
-
-    def on_mark_nodes(self, action):
-        if self.dotwidget.conflictMode is ConflictMode.CONFLICT_MODE_OFF:
-            self.dotwidget.turnOnConflictMode()
-        elif self.dotwidget.conflictMode == ConflictMode.CONFLICT_MODE_OFF or self.dotwidget.conflictMode == ConflictMode.CONFLICT_SELECTION:
-            self.dotwidget.turnOffConflictMode()
-            self.dotwidget.zoom_image(self.dotwidget.zoom_ratio, center=True)
 
     def on_open_conflict_file(self, action):
         chooser = Gtk.FileChooserDialog(parent=self,

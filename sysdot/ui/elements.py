@@ -522,7 +522,7 @@ class Graph(Shape):
 
     def __init__(self, width=1, height=1, shapes=(), nodes=(), edges=(), outputorder='breadthfirst'):
         Shape.__init__(self)
-        self.hideConflictNodes = True
+        self.conflictModeOff = True
         self.width = width
         self.height = height
         self.shapes = shapes
@@ -552,11 +552,12 @@ class Graph(Shape):
 
     def _draw_nodes(self, cr, bounding, highlight_items):
         conflictNode = None
+
         for node in self.nodes:
             if bounding is None or node._intersects(bounding):
                 highlightOn = node in highlight_items
                 if highlightOn:
-                    if self.hideConflictNodes:
+                    if self.conflictModeOff:
                         conflictNode = node
                     else:
                         node._draw(cr, highlight=True, bounding=bounding)
