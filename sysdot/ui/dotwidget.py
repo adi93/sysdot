@@ -105,6 +105,7 @@ class DotWidget(Gtk.DrawingArea):
             self.conflictMode = ConflictMode.SELECTION
             self.graph.conflictModeOff = False
             button.set_label("Confirm selection")
+            button.set_tooltip_text("Click here to confirm the selection.\nThis will lead to the reachability graph of\nthe selected nodes.")
         elif self.conflictMode is ConflictMode.SELECTION:
             self.conflictMode = ConflictMode.ON
 
@@ -117,6 +118,7 @@ class DotWidget(Gtk.DrawingArea):
             ## also set sidebar things ?
             # self.sidebar.set_nodes_and_edges(self.graph)
             button.set_label("Revert back")
+            button.set_tooltip_text("Click here to revert to the original graph.")
         elif self.conflictMode is ConflictMode.ON:
             self.conflictMode = ConflictMode.OFF
             self.graph = self.original_graph
@@ -128,6 +130,7 @@ class DotWidget(Gtk.DrawingArea):
             ## reset sidebar as well
             # self.sidebar.set_nodes_and_edges(self.graph)
             button.set_label("Select nodes")
+            button.set_tooltip_text("Click here to start selecting nodes.\nSelected nodes will be in blue.")
 
     def run_filter(self, dotcode):
         if not self.filter:
@@ -313,12 +316,6 @@ class DotWidget(Gtk.DrawingArea):
     def on_zoom_out(self, action):
         self.zoom_image(self.zoom_ratio / self.ZOOM_INCREMENT)
 
-    def on_zoom_fit(self, action):
-        self.zoom_to_fit()
-
-    def on_zoom_100(self, action):
-        self.zoom_image(1.0)
-
     POS_INCREMENT = 100
 
     def on_key_press_event(self, widget, event):
@@ -449,6 +446,7 @@ class DotWidget(Gtk.DrawingArea):
 
                 if event.button == 1: # left click
                     jump = self.get_jump(x, y)
+                    print("Jumping to ", x, y)
                     if jump is not None:
                         self.animate_to(jump.x, jump.y)
 
@@ -524,6 +522,20 @@ class DotWidget(Gtk.DrawingArea):
         x += self.x
         y += self.y
         return x, y
+    
+
+    def graph2window(self, x, y):
+        """
+        Inverse of window2graph.
+        """
+        rect = self.get_allocation()
+        x -= self.x
+        y -= self.y
+        x *= self.zoom_ratio
+        x *= self.zoom_ratio
+        x += 0.5*rect.width
+        y += 0.5*rect.height
+        return x, y
 
     def get_element(self, x, y):
         x, y = self.window2graph(x, y)
@@ -536,6 +548,17 @@ class DotWidget(Gtk.DrawingArea):
     
 
     def on_node_highlighted(self, event, nodeId):
-        # TODO: Add logic here
         print("This node was highlighted: ", nodeId)
-        pass
+        node = None
+        for n in self.graph.nodes:
+            if int(n.id) == nodeId:
+                node = n
+                break
+        self.set_highlight(items=[node])
+
+        # TODO: add logic for zooming to that place as well.
+        # Something's wrong with the code below. Even though x and y are fine, the jump is not.
+        x, y = self.graph2window(node.x, node.y)
+        print("Jumping to node", int(x), int(y))
+        self.animate_to(int(x), int(y))
+

@@ -56,6 +56,17 @@ class SideBar(Gtk.Revealer):
         conflictViewWindow.add(self.conflictTreeview)
         notebook.append_page(conflictViewWindow, Gtk.Label(label="Conflict nodes"))
 
+        # reachable nodes
+        # self.reachableTreeview = Gtk.TreeView.new()
+        # self.reachableTreeview.connect("row-activated", self.on_row_activated)
+
+        # self.treeViewSetup(self.reachableTreeview)
+        # self.treeModelSetup(self.reachableTreeview, edges={})
+
+        # reachableViewWindow = Gtk.ScrolledWindow.new()
+        # reachableViewWindow.add(self.reachableTreeview)
+        # notebook.append_page(reachableViewWindow, Gtk.Label(label="Reachable nodes"))
+
         self.set_vexpand(True)
         self.set_border_width(5)
         self.add(notebook)
@@ -66,20 +77,18 @@ class SideBar(Gtk.Revealer):
     
     def toggleVisibility(self):
         if self.get_child_revealed():
-            self.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT)
             self.set_reveal_child(False)
+            self.set_visible(False)
         else:
-            self.set_transition_type(Gtk.RevealerTransitionType.SLIDE_RIGHT)
             self.set_reveal_child(True)
+            self.set_visible(True)
 
 
     def on_highlighted(self, event, nodeId, conflictNodes=None):
         """
         When a node is clicked in the dotwidget area, this method scrolls to the corresponding
         node in the sidebar, and selects it.
-        TODO: Also highlight conflictNodes?
         """
-
         notebook = self.get_child()
         treeview = notebook.get_nth_page(notebook.get_current_page()).get_child()
         store = treeview.get_model()
@@ -98,7 +107,6 @@ class SideBar(Gtk.Revealer):
     def set_nodes_and_edges(self, graph):
         nodes = graph.nodes
         childEdges = graph.edges
-
         # reset both the stores
         self.childTreeview.get_model().clear()
         self.conflictTreeview.get_model().clear()
@@ -132,7 +140,7 @@ class SideBar(Gtk.Revealer):
         # first column is display text, last is the node id
         store = Gtk.TreeStore(GObject.TYPE_STRING, GObject.TYPE_INT)
         treeview.set_model(store)
-        self.populateTreeModel(edges=edges, treeview=treeview)
+        # self.populateTreeModel(edges=edges, treeview=treeview)
 
     def populateTreeModel(self, edges, treeview, rootIter=None):
 

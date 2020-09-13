@@ -48,8 +48,6 @@ from .elements import Node
 
 from .sidebar import SideBar
 from .dotwidget import DotWidget
-from .dotwidget import ConflictMode
-
 
 from ..conflicts import mapper
 from ..conflicts import dotCreater 
@@ -129,8 +127,8 @@ class DotWindow(Gtk.ApplicationWindow):
         # Zoom buttons
         addButton("zoom-in", self.dotwidget.on_zoom_in, "Zoom in")
         addButton("zoom-out", self.dotwidget.on_zoom_out, "Zoom out")
-        addButton("zoom-fit-best", self.dotwidget.on_zoom_fit, "Zoom to fit")
-        addButton("zoom-original", self.dotwidget.on_zoom_100, "Zoom to 100%")
+        addButton("zoom-fit-best", lambda x: self.dotwidget.zoom_to_fit(), "Zoom to fit")
+        addButton("zoom-original", lambda x: self.dotwidget.zoom_image(1.0), "Zoom to 100%")
         addSeparator()
 
         # Forward/Back - Keeping track of buttons so we can disable/enable them in on_history method.
@@ -139,9 +137,10 @@ class DotWindow(Gtk.ApplicationWindow):
 
         # Conflict file operations
         addButton("image-loading", self.on_open_conflict_file, "Load a conflict file")
-        self.conflictButton = Gtk.ToolButton(label="Select nodes")
-        self.conflictButton.connect("clicked", self.dotwidget.on_conflict_button_pressed)
-        header.pack_start(self.conflictButton)
+        conflictButton = Gtk.ToolButton(label="Select nodes")
+        conflictButton.set_tooltip_text("Click here to start selecting nodes.\nSelected nodes will be in blue.")
+        conflictButton.connect("clicked", self.dotwidget.on_conflict_button_pressed)
+        header.pack_start(conflictButton)
 
         # Add Find text search
         # find_toolitem = Gtk.ToolItem()
