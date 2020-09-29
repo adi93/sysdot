@@ -60,15 +60,19 @@ class FindMenuToolAction(Gtk.Action):
         return Gtk.ToolItem()
 
 class DotWindow(Gtk.ApplicationWindow):
+    """
+    This is the main application window. Here, the elements for toolbar, sidebar and the dotwidget
+    are created, and wired together.
+
+    Any new top-level widget should be created here.
+    """
     base_title = 'Dot Viewer'
 
     def __init__(self, widget=None, width=512, height=512):
         Gtk.Window.__init__(self)
 
-        window = self
-
-        window.set_title(self.base_title)
-        window.set_default_size(width, height)
+        self.set_title(self.base_title)
+        self.set_default_size(width, height)
 
         self.dotwidget = widget or DotWidget()
         self.dotwidget.connect("error", lambda e, m: self.error_dialog(m))
@@ -78,28 +82,28 @@ class DotWindow(Gtk.ApplicationWindow):
         self.sidebar = SideBar(widget=self.dotwidget)
         self.dotwidget.sidebar = self.sidebar
 
-        # Header
-        header = self.createHeader()
-        self.set_titlebar(header)
 
         box = Gtk.VBox()
-        box.set_homogeneous(True)
-        # box.pack_start(header)
+        box.set_homogeneous(False) # Allows toolbars to be of different sizes
 
-        self.pane = Gtk.HPaned(wide_handle=True) # makes for a better separator
-        self.pane.pack1(self.sidebar, False, True)
-        self.pane.pack2(self.dotwidget, True, False)
-        box.add(self.pane)
+        # Header
+        header = self.createHeader()
+        box.pack_start(header, False, True, 0)
+
+        # Container for sidebar
+        pane = Gtk.HPaned(wide_handle=True) # makes for a better separator
+        pane.pack1(self.sidebar, False, True)
+        pane.pack2(self.dotwidget, True, False)
+        box.add(pane)
+
         self.add(box)
 
         self.last_open_dir = "."
-
         self.set_focus(self.dotwidget)
 
         self.show_all()
 
     def createHeader(self):
-        header = Gtk.HeaderBar.new()  
 
         def addButton(iconName, callback, tooltipText=None, **kwargs):
             button = Gtk.ToolButton(icon_widget=Gtk.Image.new_from_icon_name(iconName, Gtk.IconSize.SMALL_TOOLBAR))
@@ -113,6 +117,9 @@ class DotWindow(Gtk.ApplicationWindow):
         
         def addSeparator():
             header.pack_start(Gtk.VSeparator())
+
+
+        header = Gtk.HeaderBar.new()  
 
         # Look at https://developer.gnome.org/icon-naming-spec/ for different icon names
         addButton("applications-accessories", self.hideSidebar, tooltipText="Toggle sidebar")
@@ -153,7 +160,7 @@ class DotWindow(Gtk.ApplicationWindow):
         # header.pack_start(find_toolitem)
 
         # show the standard 3 mnimize, maximize and close buttons
-        header.set_show_close_button(True)
+        # header.set_show_close_button(True)
 
         return header
     

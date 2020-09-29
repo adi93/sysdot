@@ -558,7 +558,7 @@ class DotWidget(Gtk.DrawingArea):
 
         # TODO: add logic for zooming to that place as well.
         # Something's wrong with the code below. Even though x and y are fine, the jump is not.
-        x, y = self.graph2window(node.x, node.y)
-        print("Jumping to node", int(x), int(y))
-        self.animate_to(int(x), int(y))
+        # x, y = self.graph2window(node.x, node.y)
+        # print("Jumping to node", int(x), int(y))
+        # self.animate_to(int(x), int(y))
 
