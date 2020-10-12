@@ -13,6 +13,8 @@ Features
  * Support for visualizing conflict graphs as well, by using a conflict graph file.
  * Visualizing sub-sections of graph, by marking nodes.
 
+ ![](sample_images/sysdot_sample.jpg)
+
 Requirements
 ============
 
